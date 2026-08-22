@@ -5,5 +5,5 @@ Virtuoso accessed remotely on the university's licensed PC. Each
 topic/experiment has its own folder with a dedicated README.
 
 ## Contents
-- [Remote Cadence Access Setup](#remote-cadence-access-via-university-pc)
+- [Remote Cadence Access Setup](Remote_Cadence_Access_Setup)
 - [CMOS Design](./CMOS/README.md)
