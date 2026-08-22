@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMOS Gate Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0F1C;
+    --panel:#111A2E;
+    --panel2:#0D1524;
+    --border:#22314F;
+    --border-soft:#1A2438;
+    --text:#E7ECF5;
+    --text-dim:#8FA0BE;
+    --text-faint:#5B6B8C;
+    --n-on:#22D3EE;
+    --n-on-dim:rgba(34,211,238,0.15);
+    --p-on:#FFB020;
+    --p-on-dim:rgba(255,176,32,0.15);
+    --off:#39435C;
+    --y1:#34D399;
+    --y0:#64748B;
+    --yz:#FBBF24;
+    --yx:#F87171;
+    --rail:#4A5878;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  body{padding:28px;min-height:100vh;}
+  .wrap{max-width:1280px;margin:0 auto;}
+
+  header{margin-bottom:22px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;color:var(--n-on);text-transform:uppercase;font-weight:600;}
+  h1{font-size:28px;font-weight:800;margin:6px 0 6px;letter-spacing:-0.01em;}
+  .sub{color:var(--text-dim);font-size:14.5px;max-width:680px;line-height:1.5;}
+
+  .layout{display:grid;grid-template-columns:230px 1fr 300px;gap:16px;align-items:start;}
+  @media (max-width:980px){.layout{grid-template-columns:1fr;}}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;}
+  .panel h2{font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-weight:600;margin:0 0 12px;}
+
+  /* Gate selector */
+  .gate-list{display:flex;flex-direction:column;gap:6px;}
+  .gate-btn{
+    background:var(--panel2);border:1px solid var(--border-soft);color:var(--text-dim);
+    padding:10px 12px;border-radius:9px;text-align:left;cursor:pointer;font-size:13.5px;font-weight:600;
+    font-family:'JetBrains Mono',monospace;transition:all .15s ease;
+  }
+  .gate-btn:hover{border-color:var(--n-on);color:var(--text);}
+  .gate-btn.active{background:linear-gradient(135deg,rgba(34,211,238,0.14),rgba(255,176,32,0.1));border-color:var(--n-on);color:var(--text);box-shadow:0 0 0 1px rgba(34,211,238,0.25) inset;}
+  .gate-btn .expr{display:block;font-size:11px;color:var(--text-faint);font-weight:400;margin-top:2px;}
+  .gate-btn.active .expr{color:var(--text-dim);}
+
+  /* Inputs */
+  .switches{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;background:var(--panel2);border:1px solid var(--border-soft);border-radius:9px;padding:8px 10px;}
+  .switch-row .label{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--text);}
+  .switch-btn{
+    width:52px;height:28px;border-radius:14px;border:1px solid var(--border);background:var(--off);
+    position:relative;cursor:pointer;transition:background .15s ease;flex-shrink:0;
+  }
+  .switch-btn .knob{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#0A0F1C;transition:transform .15s ease;box-shadow:0 1px 3px rgba(0,0,0,.4);}
+  .switch-btn.on{background:linear-gradient(90deg,var(--n-on),var(--n-on));}
+  .switch-btn.on .knob{transform:translateX(24px);background:#062024;}
+
+  .auto-btn{
+    margin-top:14px;width:100%;padding:10px;border-radius:9px;border:1px solid var(--border-soft);
+    background:var(--panel2);color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:12px;
+    font-weight:600;cursor:pointer;letter-spacing:.03em;
+  }
+  .auto-btn.running{background:rgba(255,176,32,0.12);border-color:var(--p-on);color:var(--p-on);}
+
+  /* View toggle */
+  .view-toggle{display:flex;background:var(--panel2);border:1px solid var(--border-soft);border-radius:9px;padding:3px;margin-top:6px;}
+  .view-toggle button{flex:1;background:transparent;border:none;color:var(--text-faint);padding:8px 6px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;cursor:pointer;}
+  .view-toggle button.active{background:var(--border);color:var(--text);}
+
+  /* SVG stage */
+  .stage{display:flex;flex-direction:column;align-items:center;padding:14px 8px 18px;}
+  svg{width:100%;height:auto;max-height:560px;}
+  .rule-badge{
+    margin-top:10px;display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+    color:var(--text-dim);background:var(--panel2);border:1px solid var(--border-soft);border-radius:20px;padding:6px 14px;
+  }
+  .rule-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--y1);box-shadow:0 0 8px var(--y1);}
+
+  /* Right panel */
+  .yval{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .yval .box{
+    font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;width:56px;height:56px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;border:1px solid;
+  }
+  .yval .desc{font-size:12.5px;color:var(--text-dim);line-height:1.5;}
+  .eq{font-family:'JetBrains Mono',monospace;font-size:15px;background:var(--panel2);border:1px solid var(--border-soft);
+    border-radius:8px;padding:10px 12px;margin-bottom:16px;color:var(--text);}
+
+  table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12.5px;}
+  th{color:var(--text-faint);font-weight:600;text-align:center;padding:5px 4px;border-bottom:1px solid var(--border-soft);font-size:11px;}
+  td{text-align:center;padding:5px 4px;color:var(--text-dim);border-bottom:1px solid rgba(255,255,255,0.03);}
+  tr.current td{color:var(--text);font-weight:700;}
+  tr.current{background:rgba(34,211,238,0.08);}
+  td.yval-1{color:var(--y1);font-weight:700;}
+  td.yval-0{color:var(--y0);}
+
+  .legend{display:flex;flex-direction:column;gap:6px;margin-top:16px;font-size:11.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;}
+  .legend .row{display:flex;align-items:center;gap:8px;}
+  .legend .sw{width:14px;height:3px;border-radius:2px;}
+
+  .flow{stroke-dasharray:7 6;animation:flow .55s linear infinite;}
+  @keyframes flow{to{stroke-dashoffset:-13;}}
+
+  .leaf-hit{cursor:pointer;}
+  .leaf-hit:hover .hit-ring{opacity:1;}
+
+  /* Working description panel */
+  .explain{margin-top:14px;width:100%;}
+  .explain-focus{
+    display:none;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--n-on);
+    border-radius:9px;padding:9px 12px;margin-bottom:10px;font-family:'JetBrains Mono',monospace;font-size:12.5px;
+  }
+  .explain-focus.show{display:flex;}
+  .explain-focus .swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .explain-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:640px){.explain-cols{grid-template-columns:1fr;}}
+  .explain-col h3{font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--text-faint);margin:0 0 8px;}
+  .branch{border-left:2px solid var(--border-soft);padding-left:10px;margin-bottom:6px;}
+  .branch.on{border-left-color:var(--n-on);}
+  .branch-children{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:12px;}
+  .branch-rule{font-size:11px;color:var(--text-faint);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+  .branch-rule b{color:var(--text);}
+  .leafdesc{padding:2px 7px;border-radius:5px;border:1px solid var(--border-soft);white-space:nowrap;}
+  .leafdesc.on.n{color:var(--n-on);border-color:var(--n-on);background:var(--n-on-dim);}
+  .leafdesc.on.p{color:var(--p-on);border-color:var(--p-on);background:var(--p-on-dim);}
+  .leafdesc.off{color:var(--text-faint);}
+  .joiner{color:var(--text-faint);font-size:11px;}
+  .conclusion{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);font-size:13px;line-height:1.6;color:var(--text-dim);}
+  .conclusion b{color:var(--text);}
+
+  footer{margin-top:22px;color:var(--text-faint);font-size:12px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CMOS VLSI · Interactive</div>
+    <h1>CMOS Gate Simulator</h1>
+    <p class="sub">Pick a gate, flip the inputs, and watch the pull-up (pMOS) and pull-down (nMOS) networks switch on and off in real time. Toggle to <b>Layout</b> to see roughly how the same network becomes silicon.</p>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT: gate + input controls -->
+    <div class="panel">
+      <h2>Select Gate</h2>
+      <div class="gate-list" id="gateList"></div>
+
+      <h2 style="margin-top:20px;">Inputs</h2>
+      <div class="switches" id="switches"></div>
+      <button class="auto-btn" id="autoBtn">▶ Step through truth table</button>
+
+      <h2 style="margin-top:20px;">View</h2>
+      <div class="view-toggle">
+        <button id="viewSchematic" class="active">Schematic</button>
+        <button id="viewLayout">Layout</button>
+      </div>
+    </div>
+
+    <!-- CENTER: SVG -->
+    <div class="panel">
+      <h2 id="stageTitle">Schematic — electrical operation</h2>
+      <div class="stage">
+        <svg id="svgStage" viewBox="0 0 600 460" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="rule-badge"><span class="dot" id="ruleDot"></span><span id="ruleText">Conduction Complement Rule holds: exactly one network conducts</span></div>
+      </div>
+
+      <div class="explain">
+        <div class="explain-focus" id="explainFocus">
+          <span class="swatch" id="focusSwatch"></span>
+          <span id="focusText"></span>
+        </div>
+        <div class="explain-cols">
+          <div class="explain-col">
+            <h3>Pull-up · pMOS</h3>
+            <div id="explainPU"></div>
+          </div>
+          <div class="explain-col">
+            <h3>Pull-down · nMOS</h3>
+            <div id="explainPD"></div>
+          </div>
+        </div>
+        <div class="conclusion" id="explainConclusion"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: output + truth table -->
+    <div class="panel">
+      <h2>Output</h2>
+      <div class="yval">
+        <div class="box" id="yBox">1</div>
+        <div class="desc" id="yDesc">Pull-up ON, pull-down OFF → Y driven to VDD.</div>
+      </div>
+      <div class="eq" id="eqText">Y = A'</div>
+
+      <h2>Truth Table</h2>
+      <div id="tableWrap"></div>
+
+      <div class="legend">
+        <div class="row"><span class="sw" style="background:var(--n-on);"></span> nMOS conducting (passes strong 0)</div>
+        <div class="row"><span class="sw" style="background:var(--p-on);"></span> pMOS conducting (passes strong 1)</div>
+        <div class="row"><span class="sw" style="background:var(--off);"></span> Transistor OFF</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Built from Lecture 1: Circuits &amp; Layout — series = AND, parallel = OR, and the pull-up network is always the structural dual of the pull-down network.</footer>
+</div>
+
+<script>
+/* ---------------- Gate definitions ---------------- */
+// Each pull-down (nMOS) tree: 'leaf' = transistor, 'series' = AND (stacked), 'parallel' = OR (side by side)
+const GATES = {
+  INV:   { name:'Inverter', inputs:['A'],
+           tree:{t:'leaf',n:'A'}, expr:"Y = A'" },
+  NAND2: { name:'NAND2', inputs:['A','B'],
+           tree:{t:'series',c:[{t:'leaf',n:'A'},{t:'leaf',n:'B'}]}, expr:"Y = (A·B)'" },
+  NAND3: { name:'NAND3', inputs:['A','B','C'],
+           tree:{t:'series',c:[{t:'leaf',n:'A'},{t:'leaf',n:'B'},{t:'leaf',n:'C'}]}, expr:"Y = (A·B·C)'" },
+  NOR2:  { name:'NOR2', inputs:['A','B'],
+           tree:{t:'parallel',c:[{t:'leaf',n:'A'},{t:'leaf',n:'B'}]}, expr:"Y = (A+B)'" },
+  NOR3:  { name:'NOR3', inputs:['A','B','C'],
+           tree:{t:'parallel',c:[{t:'leaf',n:'A'},{t:'leaf',n:'B'},{t:'leaf',n:'C'}]}, expr:"Y = (A+B+C)'" },
+  AOI21: { name:'AOI21', inputs:['A','B','C'],
+           tree:{t:'parallel',c:[{t:'series',c:[{t:'leaf',n:'A'},{t:'leaf',n:'B'}]},{t:'leaf',n:'C'}]}, expr:"Y = (A·B + C)'" },
+  OAI31: { name:'OAI31 (O3AI)', inputs:['A','B','C','D'],
+           tree:{t:'series',c:[{t:'parallel',c:[{t:'leaf',n:'A'},{t:'leaf',n:'B'},{t:'leaf',n:'C'}]},{t:'leaf',n:'D'}]}, expr:"Y = ((A+B+C)·D)'" },
+};
+
+/* ---------------- Core boolean network engine ---------------- */
+function dual(n){
+  if(n.t==='leaf') return {...n};
+  if(n.t==='series') return {t:'parallel', c:n.c.map(dual)};
+  return {t:'series', c:n.c.map(dual)};
+}
+function measure(n){
+  if(n.t==='leaf') return 1;
+  if(n.t==='series') return Math.max(...n.c.map(measure));
+  return n.c.map(measure).reduce((a,b)=>a+b,0);
+}
+function conducts(n, kind, vals){
+  if(n.t==='leaf') return kind==='n' ? vals[n.n]===1 : vals[n.n]===0;
+  if(n.t==='series') return n.c.every(ch=>conducts(ch,kind,vals));
+  return n.c.some(ch=>conducts(ch,kind,vals));
+}
+
+/* ---------------- State ---------------- */
+let state = { gateKey:'NAND2', vals:{A:0,B:0}, view:'schematic', auto:null, autoIdx:0, selectedLeaf:null };
+
+function selectLeaf(kind, name){
+  state.selectedLeaf = {kind, name};
+  render();
+}
+
+/* Build a nested cascade explanation for a network tree: shows each
+   transistor's ON/OFF state, then how series (AND) / parallel (OR)
+   combine those states, bottom-up. */
+function buildExplainTree(node, kind, vals){
+  if(node.t==='leaf'){
+    const on = kind==='n' ? vals[node.n]===1 : vals[node.n]===0;
+    const gateVal = vals[node.n];
+    const html = `<span class="leafdesc ${on?'on '+kind:'off'}">${node.n}=${gateVal} → ${on?'ON':'OFF'}</span>`;
+    return {on, html};
+  }
+  const kids = node.c.map(ch=>buildExplainTree(ch,kind,vals));
+  const on = node.t==='series' ? kids.every(k=>k.on) : kids.some(k=>k.on);
+  const joinLabel = node.t==='series' ? '<span class="joiner">then</span>' : '<span class="joiner">or</span>';
+  const rule = node.t==='series' ? 'series → needs ALL ON' : 'parallel → needs ANY ON';
+  const html = `<div class="branch ${on?'on':''}">`
+             + `<div class="branch-children">${kids.map(k=>k.html).join(joinLabel)}</div>`
+             + `<div class="branch-rule">${rule} → <b>${on?'ON':'OFF'}</b></div>`
+             + `</div>`;
+  return {on, html};
+}
+
+/* ---------------- SVG helpers ---------------- */
+const SVGNS = "http://www.w3.org/2000/svg";
+function se(tag, attrs={}, text){
+  const e = document.createElementNS(SVGNS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(text!==undefined) e.textContent = text;
+  return e;
+}
+
+/* ---------------- Rendering the network ---------------- */
+function drawNode(svg, node, kind, x0,x1,y0,y1, vals, view, activeColor, offColor){
+  const active = conducts(node, kind, vals);
+  const railColor = active ? activeColor : offColor;
+  const railCls = active ? 'flow' : '';
+
+  // top & bottom bus rails for this node's box
+  svg.appendChild(se('line',{x1:x0,y1:y0,x2:x1,y2:y0,stroke:railColor,'stroke-width':2.5,class:railCls}));
+  svg.appendChild(se('line',{x1:x0,y1:y1,x2:x1,y2:y1,stroke:railColor,'stroke-width':2.5,class:railCls}));
+
+  if(node.t==='leaf'){
+    drawLeaf(svg, node, kind, x0,x1,y0,y1, vals, view, activeColor, offColor);
+    return;
+  }
+  if(node.t==='series'){
+    const rows = node.c;
+    const rh = (y1-y0)/rows.length;
+    rows.forEach((child,i)=>{
+      const cy0 = y0+i*rh, cy1 = cy0+rh;
+      drawNode(svg, child, kind, x0,x1, cy0,cy1, vals, view, activeColor, offColor);
+    });
+    return;
+  }
+  // parallel
+  const total = measure(node);
+  let cx = x0;
+  node.c.forEach(child=>{
+    const w = (measure(child)/total)*(x1-x0);
+    drawNode(svg, child, kind, cx, cx+w, y0,y1, vals, view, activeColor, offColor);
+    cx += w;
+  });
+}
+
+function drawLeaf(svg, node, kind, x0,x1,y0,y1, vals, view, activeColor, offColor){
+  const cx = (x0+x1)/2;
+  const on = kind==='n' ? vals[node.n]===1 : vals[node.n]===0;
+  const color = on ? activeColor : offColor;
+  const midY = (y0+y1)/2;
+
+  const hitGroup = se('g',{class:'leaf-hit'});
+  hitGroup.addEventListener('click', ()=>{ selectLeaf(kind, node.n); });
+  svg.appendChild(hitGroup);
+  hitGroup.appendChild(se('rect',{x:x0,y:y0,width:(x1-x0),height:(y1-y0),fill:'transparent'}));
+  const isSelected = state.selectedLeaf && state.selectedLeaf.kind===kind && state.selectedLeaf.name===node.n;
+  if(isSelected){
+    hitGroup.appendChild(se('rect',{x:x0+4,y:y0+4,width:(x1-x0-8),height:(y1-y0-8),rx:8,fill:'none',stroke:'#FFFFFF','stroke-width':1.4,'stroke-dasharray':'4 3',opacity:0.85}));
+  }
+  svg = hitGroup; // draw the symbol itself inside the hit group so it stays clickable
+
+  if(view==='schematic'){
+    // vertical channel (source-drain path)
+    svg.appendChild(se('line',{x1:cx,y1:y0,x2:cx,y2:y1,stroke:color,'stroke-width':4,class:on?'flow':'', 'stroke-linecap':'round'}));
+    // gate stroke
+    svg.appendChild(se('line',{x1:cx-24,y1:midY,x2:cx-8,y2:midY,stroke:'#9AA7C4','stroke-width':2.5}));
+    svg.appendChild(se('line',{x1:cx-24,y1:midY-9,x2:cx-24,y2:midY+9,stroke:'#9AA7C4','stroke-width':2.5}));
+    if(kind==='p'){
+      svg.appendChild(se('circle',{cx:cx-29,cy:midY,r:4.2,fill:'none',stroke:'#9AA7C4','stroke-width':2}));
+    }
+    // gate node dot
+    svg.appendChild(se('circle',{cx:cx,cy:y0,r:3.2,fill:railDot(kind,on,activeColor,offColor)}));
+    svg.appendChild(se('circle',{cx:cx,cy:y1,r:3.2,fill:railDot(kind,on,activeColor,offColor)}));
+    // label pill
+    const labelX = kind==='p' ? cx-40 : cx-40;
+    const g = se('g',{});
+    const txt = se('text',{x:labelX,y:midY+4,'text-anchor':'end','font-family':"'JetBrains Mono',monospace",'font-size':13,'font-weight':700, fill: on? color : '#7A88A8'}, node.n);
+    g.appendChild(txt);
+    svg.appendChild(g);
+  } else {
+    // LAYOUT view: diffusion rect + poly crossbar + contacts
+    const w = Math.min(38, (x1-x0)*0.55);
+    const diffFill = kind==='n' ? 'rgba(34,211,238,0.16)' : 'rgba(255,176,32,0.14)';
+    const diffStroke = on ? color : '#3A4460';
+    svg.appendChild(se('rect',{x:cx-w/2, y:y0+6, width:w, height:(y1-y0-12), fill:diffFill, stroke:diffStroke,'stroke-width':1.6, rx:3}));
+    // poly gate bar (red)
+    const polyColor = on ? '#F16A6A' : '#5B3A3E';
+    svg.appendChild(se('rect',{x:cx-w/2-10, y:midY-5, width:w+20, height:10, fill:polyColor, opacity:0.92, rx:2}));
+    svg.appendChild(se('text',{x:cx+w/2+16, y:midY+4, 'text-anchor':'start','font-family':"'JetBrains Mono',monospace",'font-size':12,'font-weight':700, fill: on? '#F16A6A':'#8A5A5E'}, node.n));
+    // contacts
+    svg.appendChild(se('rect',{x:cx-4,y:y0+1,width:8,height:8,fill:'#0A0F1C',stroke:diffStroke,'stroke-width':1.3}));
+    svg.appendChild(se('rect',{x:cx-4,y:y1-9,width:8,height:8,fill:'#0A0F1C',stroke:diffStroke,'stroke-width':1.3}));
+  }
+}
+function railDot(kind,on,activeColor,offColor){ return on? activeColor : '#5B6B8C'; }
+
+/* ---------------- Full scene render ---------------- */
+function render(){
+  const gate = GATES[state.gateKey];
+  const pdTree = gate.tree;
+  const puTree = dual(pdTree);
+  const lanes = Math.max(measure(pdTree), measure(puTree));
+  const LANE = 96;
+  const MARGIN = 64;
+  const width = lanes*LANE + MARGIN*2;
+  const height = 460;
+
+  const svg = document.getElementById('svgStage');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.innerHTML = '';
+
+  const yVDD = 42, yPUbot = 176, yYtop=176, yYbot=222, yPDtop=222, yGND = 356;
+  const x0 = MARGIN, x1 = width-MARGIN;
+  const cxMid = width/2;
+
+  const pd = conducts(pdTree,'n',state.vals);
+  const pu = conducts(puTree,'p',state.vals);
+  let yVal, yDesc, boxStyle, ruleOk=true, ruleMsg;
+  if(pu && !pd){ yVal='1'; yDesc='Pull-up network ON, pull-down OFF → output driven to VDD (strong 1).'; }
+  else if(pd && !pu){ yVal='0'; yDesc='Pull-down network ON, pull-up OFF → output driven to GND (strong 0).'; }
+  else if(!pd && !pu){ yVal='Z'; yDesc="Both networks OFF — output floats. (Shouldn't happen in a valid complementary gate.)"; ruleOk=false; }
+  else { yVal='X'; yDesc='Both networks ON → crowbar short from VDD to GND!'; ruleOk=false; }
+  ruleMsg = ruleOk ? 'Conduction Complement Rule holds: exactly one network conducts' : 'Rule violated — this input combo should be impossible for a valid gate';
+
+  // VDD rail + label
+  svg.appendChild(se('text',{x:cxMid,y:yVDD-18,'text-anchor':'middle','font-family':"'JetBrains Mono',monospace",'font-size':13,'font-weight':700,fill:'#9AA7C4'},'VDD'));
+  svg.appendChild(se('line',{x1:cxMid,y1:yVDD-12,x2:cxMid,y2:yVDD,stroke:'#4A5878','stroke-width':2.5}));
+
+  // pull-up network (pMOS, dual tree)
+  drawNode(svg, puTree, 'p', x0, x1, yVDD, yPUbot, state.vals, state.view, '#FFB020', '#39435C');
+
+  // Y node wire
+  const yWireColor = (yVal==='1') ? '#FFB020' : (yVal==='0' ? '#22D3EE' : '#8892a6');
+  svg.appendChild(se('line',{x1:cxMid,y1:yPUbot,x2:cxMid,y2:yPDtop,stroke:yWireColor,'stroke-width':3, class: (yVal==='0'||yVal==='1')?'flow':''}));
+  svg.appendChild(se('circle',{cx:cxMid,cy:(yPUbot+yPDtop)/2,r:6,fill:'#0A0F1C',stroke:yWireColor,'stroke-width':2.5}));
+  svg.appendChild(se('text',{x:cxMid+16,y:(yPUbot+yPDtop)/2+5,'font-family':"'JetBrains Mono',monospace",'font-size':14,'font-weight':700,fill:'#E7ECF5'},'Y'));
+
+  // pull-down network (nMOS)
+  drawNode(svg, pdTree, 'n', x0, x1, yPDtop, yGND, state.vals, state.view, '#22D3EE', '#39435C');
+
+  // GND rail + label + ground symbol
+  svg.appendChild(se('line',{x1:cxMid,y1:yGND,x2:cxMid,y2:yGND+12,stroke:'#4A5878','stroke-width':2.5}));
+  [0,1,2].forEach(i=>{
+    const w = 16-i*5;
+    svg.appendChild(se('line',{x1:cxMid-w,y1:yGND+12+i*6,x2:cxMid+w,y2:yGND+12+i*6,stroke:'#4A5878','stroke-width':2.2}));
+  });
+  svg.appendChild(se('text',{x:cxMid,y:yGND+52,'text-anchor':'middle','font-family':"'JetBrains Mono',monospace",'font-size':13,'font-weight':700,fill:'#9AA7C4'},'GND'));
+
+  // region labels
+  svg.appendChild(se('text',{x:x0-6,y:(yVDD+yPUbot)/2,'text-anchor':'end','font-family':"'JetBrains Mono',monospace",'font-size':10.5,fill:'#5B6B8C',transform:`rotate(-90 ${x0-6} ${(yVDD+yPUbot)/2})`},'PULL-UP · pMOS'));
+  svg.appendChild(se('text',{x:x0-6,y:(yPDtop+yGND)/2,'text-anchor':'end','font-family':"'JetBrains Mono',monospace",'font-size':10.5,fill:'#5B6B8C',transform:`rotate(-90 ${x0-6} ${(yPDtop+yGND)/2})`},'PULL-DOWN · nMOS'));
+
+  // ---- side panel updates ----
+  document.getElementById('yBox').textContent = yVal;
+  const boxEl = document.getElementById('yBox');
+  const colorMap = {'1':['#34D399','rgba(52,211,153,0.12)'], '0':['#94A3B8','rgba(148,163,184,0.1)'], 'Z':['#FBBF24','rgba(251,191,36,0.12)'], 'X':['#F87171','rgba(248,113,113,0.14)']};
+  boxEl.style.color = colorMap[yVal][0];
+  boxEl.style.background = colorMap[yVal][1];
+  boxEl.style.borderColor = colorMap[yVal][0];
+  document.getElementById('yDesc').textContent = yDesc;
+  document.getElementById('eqText').textContent = gate.expr;
+  document.getElementById('ruleText').textContent = ruleMsg;
+  document.getElementById('ruleDot').style.background = ruleOk ? '#34D399' : '#F87171';
+  document.getElementById('ruleDot').style.boxShadow = ruleOk ? '0 0 8px #34D399' : '0 0 8px #F87171';
+  document.getElementById('stageTitle').textContent = state.view==='schematic' ? 'Schematic — electrical operation' : 'Layout sketch — simplified silicon geometry';
+
+  renderTruthTable(gate);
+
+  // ---- working description (cascade) ----
+  const puExplain = buildExplainTree(puTree, 'p', state.vals);
+  const pdExplain = buildExplainTree(pdTree, 'n', state.vals);
+  document.getElementById('explainPU').innerHTML = puExplain.html;
+  document.getElementById('explainPD').innerHTML = pdExplain.html;
+  document.getElementById('explainConclusion').innerHTML =
+    `Pull-up is <b>${pu?'ON':'OFF'}</b>, pull-down is <b>${pd?'ON':'OFF'}</b> → <b>${yDesc}</b>`;
+
+  // ---- selected transistor focus callout ----
+  const focusEl = document.getElementById('explainFocus');
+  if(state.selectedLeaf && gate.inputs.includes(state.selectedLeaf.name)){
+    const {kind, name} = state.selectedLeaf;
+    const val = state.vals[name];
+    const on = kind==='n' ? val===1 : val===0;
+    const rule = kind==='n' ? 'nMOS conducts when its gate = 1' : 'pMOS conducts when its gate = 0';
+    const passes = kind==='n' ? 'passes a strong 0 toward GND' : 'passes a strong 1 toward VDD';
+    focusEl.classList.add('show');
+    document.getElementById('focusSwatch').style.background = on ? (kind==='n'?'#22D3EE':'#FFB020') : '#39435C';
+    document.getElementById('focusText').innerHTML =
+      `<b>${name}</b> (${kind==='n'?'nMOS':'pMOS'}, ${kind==='n'?'pull-down':'pull-up'}) — gate=${val} → <b>${on?'ON':'OFF'}</b>. Rule: ${rule}, so when ON it ${passes}.`;
+  } else {
+    focusEl.classList.remove('show');
+  }
+}
+
+function renderTruthTable(gate){
+  const wrap = document.getElementById('tableWrap');
+  const n = gate.inputs.length;
+  let html = '<table><thead><tr>';
+  gate.inputs.forEach(i=>html+=`<th>${i}</th>`);
+  html += '<th>Y</th></tr></thead><tbody>';
+  for(let i=0;i<(1<<n);i++){
+    const vals={};
+    gate.inputs.forEach((inp,idx)=>vals[inp]=(i>>(n-1-idx))&1);
+    const pu = conducts(dual(gate.tree),'p',vals);
+    const pd = conducts(gate.tree,'n',vals);
+    const y = (pu&&!pd)?'1':(pd&&!pu)?'0':(!pu&&!pd)?'Z':'X';
+    const isCurrent = gate.inputs.every(inp=>state.vals[inp]===vals[inp]);
+    html += `<tr class="${isCurrent?'current':''}">`;
+    gate.inputs.forEach(inp=>html+=`<td>${vals[inp]}</td>`);
+    html += `<td class="yval-${y}">${y}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+/* ---------------- Controls ---------------- */
+function buildGateList(){
+  const list = document.getElementById('gateList');
+  list.innerHTML='';
+  Object.entries(GATES).forEach(([key,g])=>{
+    const btn = document.createElement('button');
+    btn.className = 'gate-btn'+(key===state.gateKey?' active':'');
+    btn.innerHTML = `${g.name}<span class="expr">${g.expr}</span>`;
+    btn.onclick = ()=>{
+      state.gateKey = key;
+      state.vals = {}; g.inputs.forEach(i=>state.vals[i]=0);
+      stopAuto();
+      buildGateList(); buildSwitches(); render();
+    };
+    list.appendChild(btn);
+  });
+}
+function buildSwitches(){
+  const gate = GATES[state.gateKey];
+  const wrap = document.getElementById('switches');
+  wrap.innerHTML='';
+  gate.inputs.forEach(inp=>{
+    const row = document.createElement('div');
+    row.className='switch-row';
+    const label = document.createElement('span');
+    label.className='label'; label.textContent = inp+' = '+state.vals[inp];
+    const sw = document.createElement('div');
+    sw.className = 'switch-btn'+(state.vals[inp]?' on':'');
+    sw.innerHTML = '<div class="knob"></div>';
+    sw.onclick = ()=>{ state.vals[inp] = state.vals[inp]?0:1; buildSwitches(); render(); };
+    row.appendChild(label); row.appendChild(sw);
+    wrap.appendChild(row);
+  });
+}
+function stopAuto(){
+  if(state.auto){ clearInterval(state.auto); state.auto=null; }
+  document.getElementById('autoBtn').classList.remove('running');
+  document.getElementById('autoBtn').textContent = '▶ Step through truth table';
+}
+document.getElementById('autoBtn').onclick = ()=>{
+  if(state.auto){ stopAuto(); return; }
+  const gate = GATES[state.gateKey];
+  const n = gate.inputs.length;
+  state.autoIdx = 0;
+  document.getElementById('autoBtn').classList.add('running');
+  document.getElementById('autoBtn').textContent = '■ Stop';
+  state.auto = setInterval(()=>{
+    const i = state.autoIdx % (1<<n);
+    gate.inputs.forEach((inp,idx)=>state.vals[inp]=(i>>(n-1-idx))&1);
+    state.autoIdx++;
+    buildSwitches(); render();
+  }, 900);
+};
+
+document.getElementById('viewSchematic').onclick = ()=>{
+  state.view='schematic';
+  document.getElementById('viewSchematic').classList.add('active');
+  document.getElementById('viewLayout').classList.remove('active');
+  render();
+};
+document.getElementById('viewLayout').onclick = ()=>{
+  state.view='layout';
+  document.getElementById('viewLayout').classList.add('active');
+  document.getElementById('viewSchematic').classList.remove('active');
+  render();
+};
+
+/* ---------------- Init ---------------- */
+buildGateList();
+buildSwitches();
+render();
+</script>
+</body>
+</html>
