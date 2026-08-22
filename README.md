@@ -6,4 +6,4 @@ topic/experiment has its own folder with a dedicated README.
 
 ## Contents
 - [Remote Cadence Access Setup](Remote_Cadence_Access_Setup)
-- [CMOS Design](./CMOS/README.md)
+- [CMOS Design](CMOS_Design)
